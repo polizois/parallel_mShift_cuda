@@ -194,6 +194,10 @@ int main(int argc, char *argv[])
 		exportResults(x, ROWS, COLS, THREADSPERBLOCK, duration, iters);
 	}
 
+  // Checking for errors
+  int errs = errors(y, ROWS, COLS);
+  if(errs != -1) printf("Errors = %d\n", errs);
+
 	// Freeing the allocated memory
 	free2d(x); free2d(y); free2d(temp);
 	cudaFree(dx); cudaFree(dy); cudaFree(dtemp);
@@ -373,35 +377,40 @@ double timeCalc(struct timeval start, struct timeval end)
 	return (double)( ( end.tv_usec - start.tv_usec ) / 1.0e6 + end.tv_sec - start.tv_sec );
 }
 
-// Opens a binary file that has the results of e serial execution of mean shift for the same data
+// Opens a binary file that has the results of a serial execution of mean shift for the same data
 // Checks the points stored in y for errors, counts the errors and returns them
+// The binary files used for comparisson should be stored in a folder called "compare" in the same
+// directory with proggram
+// For example if we want to test our result for the data set of 600 2-dimentional points we
+// refer to the ./compare/600_2.bin file
 int errors(double **y, int rows, int cols)
 {
 	FILE *data;
 	double *tempLine;
-	char fileName[100];
+	char fileName[650];
 	int i,j, er=0;
 
 	//Generating the file name
-	sprintf(fileName, "./results/serial_%d_%d.bin", rows, cols);
+	sprintf(fileName, "./compare/%d_%d.bin", rows, cols);
 	// Allocating space for the reading line
 	tempLine = (double *) malloc(cols * sizeof(double));
 
 	//Opening the label results binary file for reading
 	data=fopen(fileName,"rb");
-	if (!data){ printf("Unable to open file!"); return 1; }
+	if (!data){ printf("Unable to open file in order to compare results!\n"); return -1; }
 
 	// Finding the correct place to start loadng
-	fseek(data, 0, SEEK_SET);
+	//fseek(data, 0, SEEK_SET);
 
 	// reading every line and checking if theres a difference between my results and those from matlab
 	for (i=0; i < rows; i++)
 	{
 		//Loading a label
 		if(!fread(tempLine, sizeof(double), cols, data))
-			{ printf("Unable to read from file!"); return 1; }
+			{ printf("Unable to read from file!\n"); return -1; }
 		for(j=0;j<cols;j++)
-			if(tempLine[j] != y[i][j]) { er++; break; }
+			// comparing with 10 decimal percision
+			if((int)(10000000000*tempLine[j]) != (int)(10000000000*y[0][j*rows+i])) { er++; break; }
 	}
 	//Closing the binary files
 	fclose(data);
